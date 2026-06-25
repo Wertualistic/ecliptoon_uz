@@ -18,33 +18,7 @@ class ChapterController extends Controller
         $chapter = Chapter::with(['series'])->findOrFail($id);
         $user = $request->user('sanctum');
 
-        // 1. Sequential reading check
-        if (!$user || !in_array($user->role, ['admin', 'moderator'])) {
-            $prevChapter = Chapter::where('series_id', $chapter->series_id)
-                ->where('chapter_number', '<', $chapter->chapter_number)
-                ->orderBy('chapter_number', 'desc')
-                ->first();
-
-            if ($prevChapter) {
-                if (!$user) {
-                    return response()->json([
-                        'message' => 'Ushbu bobni o\'qishdan oldin avvalgi bobni o\'qishingiz kerak. Iltimos, hisobingizga kiring.',
-                        'code' => 'sequential_locked'
-                    ], 403);
-                }
-
-                $hasReadPrev = \App\Models\ChapterRead::where('user_id', $user->id)->where('chapter_id', $prevChapter->id)->exists()
-                    || \App\Models\ChapterPurchase::where('user_id', $user->id)->where('chapter_id', $prevChapter->id)->exists();
-
-                if (!$hasReadPrev) {
-                    return response()->json([
-                        'message' => 'Ushbu bobni o\'qishdan oldin avvalgi bobni o\'qishingiz kerak.',
-                        'code' => 'sequential_locked',
-                        'prev_chapter_id' => $prevChapter->id
-                    ], 403);
-                }
-            }
-        }
+        // Sequential reading check disabled
 
         // Increment views
         $chapter->increment('views_count');
@@ -89,7 +63,13 @@ class ChapterController extends Controller
         ];
 
         if ($isUnlocked) {
-            if ($chapter->pdf_path) {
+            $pagesArray = is_string($chapter->pages) ? json_decode($chapter->pages, true) : $chapter->pages;
+            
+            if (!empty($pagesArray)) {
+                $response['pages'] = array_map(function($page) {
+                    return asset('storage/' . $page);
+                }, $pagesArray);
+            } elseif ($chapter->pdf_path) {
                 $response['pdf_url'] = asset('storage/' . $chapter->pdf_path);
             } else {
                 // Fallback to images for older chapters

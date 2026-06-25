@@ -15,6 +15,9 @@ use App\Models\Report;
 use App\Models\Notification;
 use App\Models\Setting;
 use App\Models\RolePermission;
+use App\Models\Category;
+use App\Models\Coupon;
+use App\Jobs\ProcessChapterPdf;
 use App\Models\TranslatorApplication;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -117,11 +120,12 @@ class AdminController extends Controller
             'slug' => 'nullable|string|unique:series,slug',
             'alternative_titles' => 'nullable|array',
             'description' => 'nullable|string',
-            'cover_image' => 'nullable|image|max:2048', // max 2MB
+            'cover_image' => 'nullable|image|max:10240', // max 10MB
             'type' => 'required|in:manhwa,manga,manhua',
             'status' => 'required|in:ongoing,completed,paused,dropped',
             'is_mature' => 'nullable|boolean',
             'is_pinned' => 'nullable|boolean',
+            'is_slider' => 'nullable|boolean',
             'genres' => 'nullable|array',
             'genres.*' => 'exists:genres,id',
             'sponsors' => 'nullable|array',
@@ -153,6 +157,7 @@ class AdminController extends Controller
             'status' => $request->status,
             'is_mature' => filter_var($request->is_mature, FILTER_VALIDATE_BOOLEAN),
             'is_pinned' => filter_var($request->is_pinned, FILTER_VALIDATE_BOOLEAN),
+            'is_slider' => filter_var($request->is_slider, FILTER_VALIDATE_BOOLEAN),
             'translator_id' => $request->user()->role === 'translator' ? $request->user()->id : null,
         ]);
 
@@ -185,11 +190,12 @@ class AdminController extends Controller
             'slug' => 'nullable|string|unique:series,slug,' . $id,
             'alternative_titles' => 'nullable|array',
             'description' => 'nullable|string',
-            'cover_image' => 'nullable|image|max:2048',
+            'cover_image' => 'nullable|image|max:10240', // max 10MB
             'type' => 'required|in:manhwa,manga,manhua',
             'status' => 'required|in:ongoing,completed,paused,dropped',
             'is_mature' => 'nullable|boolean',
             'is_pinned' => 'nullable|boolean',
+            'is_slider' => 'nullable|boolean',
             'genres' => 'nullable|array',
             'genres.*' => 'exists:genres,id',
             'sponsors' => 'nullable|array',
@@ -215,6 +221,7 @@ class AdminController extends Controller
         $series->status = $request->status;
         $series->is_mature = filter_var($request->is_mature, FILTER_VALIDATE_BOOLEAN);
         $series->is_pinned = filter_var($request->is_pinned, FILTER_VALIDATE_BOOLEAN);
+        $series->is_slider = filter_var($request->is_slider, FILTER_VALIDATE_BOOLEAN);
         $series->save();
 
         if ($request->genres) {
@@ -247,6 +254,11 @@ class AdminController extends Controller
 
         if ($series->cover_image) {
             Storage::disk('public')->delete($series->cover_image);
+        }
+
+        // Delete all chapter files associated with this series
+        foreach ($series->chapters as $chapter) {
+            $this->deleteChapterFiles($chapter);
         }
 
         $series->delete();
@@ -307,6 +319,50 @@ class AdminController extends Controller
         ], 201);
     }
 
+    public function updateChapter($id, Request $request)
+    {
+        $this->checkPermission($request, 'series');
+        $chapter = Chapter::findOrFail($id);
+        $series = $chapter->series;
+
+        $user = $request->user();
+        if ($user->role === 'translator' && $series->translator_id !== $user->id) {
+            abort(403, 'Siz faqat o\'zingizning manhwalaringiz boblarini tahrirlay olasiz.');
+        }
+
+        $request->validate([
+            'chapter_number' => 'required|numeric',
+            'title' => 'nullable|string|max:255',
+            'is_free' => 'required|boolean',
+            'price_in_diamonds' => 'required|integer|min:0',
+        ]);
+
+        // Check if chapter number exists in series (excluding current chapter)
+        $exists = Chapter::where('series_id', $series->id)
+            ->where('chapter_number', $request->chapter_number)
+            ->where('id', '!=', $id)
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'errors' => [
+                    'chapter_number' => ['Ushbu bob raqami ushbu serialda allaqachon mavjud.']
+                ]
+            ], 422);
+        }
+
+        $chapter->chapter_number = $request->chapter_number;
+        $chapter->title = $request->title;
+        $chapter->is_free = $request->is_free;
+        $chapter->price_in_diamonds = $request->is_free ? 0 : $request->price_in_diamonds;
+        $chapter->save();
+
+        return response()->json([
+            'message' => 'Bob muvaffaqiyatli yangilandi.',
+            'chapter' => $chapter
+        ]);
+    }
+
     public function uploadChapterImages($chapterId, Request $request)
     {
         $this->checkPermission($request, 'series');
@@ -350,8 +406,11 @@ class AdminController extends Controller
         $chapter->pdf_path = $path;
         $chapter->save();
 
+        // Dispatch background job to slice PDF into images
+        ProcessChapterPdf::dispatch($chapter);
+
         return response()->json([
-            'message' => 'PDF fayli muvaffaqiyatli yuklandi.',
+            'message' => 'PDF fayli muvaffaqiyatli yuklandi va fon rejimida qayta ishlashga yuborildi.',
             'pdf_url' => asset('storage/' . $path)
         ], 200);
     }
@@ -367,14 +426,7 @@ class AdminController extends Controller
         }
 
         // Delete files from storage
-        $images = ChapterImage::where('chapter_id', $chapter->id)->get();
-        foreach ($images as $img) {
-            Storage::disk('public')->delete($img->image_path);
-        }
-
-        if ($chapter->pdf_path) {
-            Storage::disk('public')->delete($chapter->pdf_path);
-        }
+        $this->deleteChapterFiles($chapter);
 
         $chapter->delete();
 
@@ -386,6 +438,31 @@ class AdminController extends Controller
     /* ==========================================
        GENRES CRUD
        ========================================== */
+
+    private function deleteChapterFiles($chapter)
+    {
+        // Delete uploaded raw images
+        $images = ChapterImage::where('chapter_id', $chapter->id)->get();
+        foreach ($images as $img) {
+            Storage::disk('public')->delete($img->image_path);
+        }
+
+        // Delete raw PDF
+        if ($chapter->pdf_path) {
+            Storage::disk('public')->delete($chapter->pdf_path);
+        }
+
+        // Delete WebP generated pages folder
+        $pagesArray = is_string($chapter->pages) ? json_decode($chapter->pages, true) : $chapter->pages;
+        if (!empty($pagesArray) && is_array($pagesArray) && count($pagesArray) > 0) {
+            $firstPage = $pagesArray[0];
+            $directory = dirname($firstPage);
+            // Safety check to ensure we don't delete root directories
+            if ($directory && $directory !== '.' && str_starts_with($directory, 'chapters/')) {
+                Storage::disk('public')->deleteDirectory($directory);
+            }
+        }
+    }
 
     public function storeGenre(Request $request)
     {

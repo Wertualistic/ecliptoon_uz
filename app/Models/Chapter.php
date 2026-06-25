@@ -2,16 +2,26 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['series_id', 'chapter_number', 'title', 'is_free', 'price_in_diamonds', 'published_at', 'views_count', 'pdf_path'])]
 class Chapter extends Model
 {
     use HasFactory;
+
+    protected $fillable = [
+        'series_id',
+        'chapter_number',
+        'title',
+        'is_free',
+        'price_in_diamonds',
+        'published_at',
+        'views_count',
+        'pdf_path',
+        'pages'
+    ];
 
     protected function casts(): array
     {

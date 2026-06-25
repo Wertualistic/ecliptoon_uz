@@ -10,18 +10,22 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CouponController;
 use App\Http\Controllers\SponsorController;
 use App\Http\Controllers\RatingLikeController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // 1. Auth routes
 Route::prefix('auth')->group(function () {
     Route::post('/register-request', [AuthController::class, 'registerRequest']);
     Route::post('/register-verify', [AuthController::class, 'registerVerify']);
+    Route::post('/forgot-password-request', [AuthController::class, 'forgotPasswordRequest']);
+    Route::post('/forgot-password-verify', [AuthController::class, 'forgotPasswordVerify']);
     Route::post('/login', [AuthController::class, 'login']);
     
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/user/avatar', [AuthController::class, 'updateAvatar']);
+        Route::post('/user/change-password', [AuthController::class, 'changePassword']);
 
         // Cart Actions
         Route::get('/cart', [\App\Http\Controllers\CartController::class, 'index']);
@@ -40,6 +44,7 @@ Route::get('/series/{slug}/chapters', [CatalogController::class, 'seriesChapters
 Route::get('/chapters/{id}', [ChapterController::class, 'show']); // handles guest/auth checks
 Route::get('/genres', [CatalogController::class, 'genres']);
 Route::get('/trending', [CatalogController::class, 'trending']);
+Route::get('/slider', [CatalogController::class, 'slider']);
 Route::get('/latest-updates', [CatalogController::class, 'latestUpdates']);
 Route::get('/completed', [CatalogController::class, 'completed']);
 Route::get('/sponsors', [SponsorController::class, 'publicIndex']);
@@ -109,6 +114,7 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     
     // Chapters CRUD + Images
     Route::post('/series/{seriesId}/chapters', [AdminController::class, 'storeChapter']);
+    Route::put('/chapters/{id}', [AdminController::class, 'updateChapter']);
     Route::post('/chapters/{chapterId}/images', [AdminController::class, 'uploadChapterImages']);
     Route::delete('/chapters/{id}', [AdminController::class, 'deleteChapter']);
 

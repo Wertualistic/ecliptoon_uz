@@ -137,11 +137,11 @@ class CatalogController extends Controller
         // 1. Top Daily Readers (unique chapter reads today by standard active users)
         $topReaders = DB::table('chapter_reads')
             ->join('users', 'chapter_reads.user_id', '=', 'users.id')
-            ->select('users.id', 'users.name', 'users.avatar', DB::raw('COUNT(chapter_reads.id) as chapters_count'))
+            ->select('users.id', 'users.name', 'users.avatar_url', DB::raw('COUNT(chapter_reads.id) as chapters_count'))
             ->whereDate('chapter_reads.created_at', now()->toDateString())
             ->where('users.role', '=', 'user')
             ->where('users.is_banned', '=', false)
-            ->groupBy('users.id', 'users.name', 'users.avatar')
+            ->groupBy('users.id', 'users.name', 'users.avatar_url')
             ->orderBy('chapters_count', 'desc')
             ->limit(10)
             ->get()
@@ -149,7 +149,7 @@ class CatalogController extends Controller
                 return [
                     'id' => $row->id,
                     'name' => $row->name,
-                    'avatar_url' => $row->avatar ? asset('storage/' . $row->avatar) : null,
+                    'avatar_url' => $row->avatar_url ? asset('storage/' . $row->avatar_url) : null,
                     'score' => (int)$row->chapters_count,
                 ];
             });
@@ -157,11 +157,11 @@ class CatalogController extends Controller
         // 2. Top Diamond Buyers (total diamonds purchased by standard active users)
         $topBuyers = DB::table('diamond_transactions')
             ->join('users', 'diamond_transactions.user_id', '=', 'users.id')
-            ->select('users.id', 'users.name', 'users.avatar', DB::raw('SUM(diamond_transactions.amount) as total_diamonds'))
+            ->select('users.id', 'users.name', 'users.avatar_url', DB::raw('SUM(diamond_transactions.amount) as total_diamonds'))
             ->where('diamond_transactions.type', '=', 'topup')
             ->where('users.role', '=', 'user')
             ->where('users.is_banned', '=', false)
-            ->groupBy('users.id', 'users.name', 'users.avatar')
+            ->groupBy('users.id', 'users.name', 'users.avatar_url')
             ->orderBy('total_diamonds', 'desc')
             ->limit(10)
             ->get()
@@ -169,7 +169,7 @@ class CatalogController extends Controller
                 return [
                     'id' => $row->id,
                     'name' => $row->name,
-                    'avatar_url' => $row->avatar ? asset('storage/' . $row->avatar) : null,
+                    'avatar_url' => $row->avatar_url ? asset('storage/' . $row->avatar_url) : null,
                     'score' => (int)$row->total_diamonds,
                 ];
             });
@@ -178,5 +178,27 @@ class CatalogController extends Controller
             'top_readers' => $topReaders,
             'top_buyers' => $topBuyers,
         ]);
+    }
+
+    /**
+     * Get series marked to be shown in the home page slider.
+     */
+    public function slider()
+    {
+        $sliderSeries = Series::with('genres')
+            ->where('is_slider', true)
+            ->orderBy('updated_at', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Fallback to trending if no series is marked as is_slider
+        if ($sliderSeries->isEmpty()) {
+            $sliderSeries = Series::with('genres')
+                ->orderBy('views_count', 'desc')
+                ->limit(4)
+                ->get();
+        }
+
+        return response()->json($sliderSeries);
     }
 }

@@ -142,6 +142,87 @@ class AuthController extends Controller
         ], 201);
     }
 
+    public function forgotPasswordRequest(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|string|email|exists:users,email',
+        ]);
+
+        $code = sprintf("%06d", mt_rand(0, 999999));
+
+        \Illuminate\Support\Facades\DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $request->email],
+            ['token' => $code, 'created_at' => now()]
+        );
+
+        \Illuminate\Support\Facades\Mail::raw("Sizning Ecliptoon platformasida parolni tiklash kodingiz: {$code}. Kod 15 daqiqa davomida faol.", function ($message) use ($request) {
+            $message->to($request->email)->subject("Ecliptoon: Parolni tiklash kodi");
+        });
+
+        return response()->json([
+            'message' => 'Parolni tiklash kodi emailingizga yuborildi.'
+        ]);
+    }
+
+    public function forgotPasswordVerify(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|string|email|exists:users,email',
+            'code' => 'required|string|size:6',
+            'password' => 'required|string|min:6',
+        ]);
+
+        $tokenRecord = \Illuminate\Support\Facades\DB::table('password_reset_tokens')
+            ->where('email', $request->email)
+            ->first();
+
+        if (!$tokenRecord || $tokenRecord->token !== $request->code) {
+            throw ValidationException::withMessages([
+                'code' => ['Kiritilgan tasdiqlash kodi noto\'g\'ri.'],
+            ]);
+        }
+
+        if (\Carbon\Carbon::parse($tokenRecord->created_at)->addMinutes(15)->isPast()) {
+            \Illuminate\Support\Facades\DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+            throw ValidationException::withMessages([
+                'code' => ['Tasdiqlash kodining muddati tugagan.'],
+            ]);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        \Illuminate\Support\Facades\DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
+        return response()->json([
+            'message' => 'Parolingiz muvaffaqiyatli o\'zgartirildi.'
+        ]);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:6',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Joriy parol noto\'g\'ri kiritildi.'],
+            ]);
+        }
+
+        $user->password = Hash::make($request->new_password);
+        $user->save();
+
+        return response()->json([
+            'message' => 'Parolingiz muvaffaqiyatli yangilandi.'
+        ]);
+    }
+
     /**
      * Login user and return token.
      */
