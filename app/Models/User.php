@@ -153,6 +153,9 @@ class User extends Authenticatable
             if ($this->role === 'moderator') {
                 return ['series', 'sponsors'];
             }
+            if ($this->role === 'translator') {
+                return ['series'];
+            }
             return [];
         }
     }

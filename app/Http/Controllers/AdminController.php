@@ -102,13 +102,13 @@ class AdminController extends Controller
     {
         $this->checkPermission($request, 'series');
         $user = $request->user();
-        
+
         $query = Series::with(['genres', 'sponsors'])->orderBy('created_at', 'desc');
-        
+
         if ($user->role === 'translator') {
             $query->where('translator_id', $user->id);
         }
-        
+
         return response()->json($query->get());
     }
 
@@ -133,7 +133,7 @@ class AdminController extends Controller
         ]);
 
         $slug = $request->slug ? Str::slug($request->slug) : Str::slug($request->title);
-        
+
         // Ensure slug is unique
         $baseSlug = $slug;
         $counter = 1;
@@ -179,7 +179,7 @@ class AdminController extends Controller
     {
         $this->checkPermission($request, 'series');
         $series = Series::findOrFail($id);
-        
+
         $user = $request->user();
         if ($user->role === 'translator' && $series->translator_id !== $user->id) {
             abort(403, 'Siz faqat o\'zingizning manhwalaringizni tahrirlay olasiz.');
@@ -276,7 +276,7 @@ class AdminController extends Controller
     {
         $this->checkPermission($request, 'series');
         $series = Series::findOrFail($seriesId);
-        
+
         $user = $request->user();
         if ($user->role === 'translator' && $series->translator_id !== $user->id) {
             abort(403, 'Siz faqat o\'zingizning manhwalaringizga bob qo\'sha olasiz.');
@@ -629,14 +629,14 @@ class AdminController extends Controller
     public function listTopupRequests(Request $request)
     {
         $this->checkPermission($request, 'topup_requests');
-        
+
         $query = TopupRequest::with(['user', 'package']);
 
         if ($request->has('status') && $request->status) {
             $query->where('status', $request->status);
         }
 
-        $requests = $query->orderBy('created_at', 'desc')->get()->map(function($req) {
+        $requests = $query->orderBy('created_at', 'desc')->get()->map(function ($req) {
             return [
                 'id' => $req->id,
                 'user_name' => $req->user->name,
@@ -749,7 +749,7 @@ class AdminController extends Controller
         $reports = Report::with(['user', 'series', 'chapter'])
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function($rep) {
+            ->map(function ($rep) {
                 return [
                     'id' => $rep->id,
                     'user_name' => $rep->user ? $rep->user->name : 'Mehmon (Guest)',
@@ -784,7 +784,7 @@ class AdminController extends Controller
     {
         $this->checkAdmin($request);
 
-        $roles = ['moderator']; // config roles list
+        $roles = ['moderator', 'translator']; // config roles list
         $permissionsList = [
             ['key' => 'dashboard', 'label' => 'Boshqaruv paneli analitikasi (Dashboard Stats)'],
             ['key' => 'topup_requests', 'label' => 'To\'lov arizalarini ko\'rib chiqish (Top-up Requests)'],
@@ -797,7 +797,7 @@ class AdminController extends Controller
             ['key' => 'orders', 'label' => 'Buyurtmalar boshqaruvi (Orders)'],
         ];
 
-        $activePermissions = \App\Models\RolePermission::all()->groupBy('role')->map(function($items) {
+        $activePermissions = \App\Models\RolePermission::all()->groupBy('role')->map(function ($items) {
             return $items->pluck('permission');
         });
 
@@ -816,14 +816,14 @@ class AdminController extends Controller
         $this->checkAdmin($request);
 
         $request->validate([
-            'role' => 'required|string|in:moderator',
+            'role' => 'required|string|in:moderator,translator',
             'permissions' => 'present|array',
             'permissions.*' => 'string'
         ]);
 
         $role = $request->role;
 
-        DB::transaction(function() use ($role, $request) {
+        DB::transaction(function () use ($role, $request) {
             \App\Models\RolePermission::where('role', $role)->delete();
 
             $data = [];
@@ -871,7 +871,7 @@ class AdminController extends Controller
         ]);
 
         $application = TranslatorApplication::findOrFail($id);
-        
+
         if ($application->status !== 'pending') {
             return response()->json(['message' => 'Bu ariza allaqachon ko\'rib chiqilgan.'], 400);
         }
