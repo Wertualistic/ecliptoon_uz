@@ -299,4 +299,42 @@ class AuthController extends Controller
             'user' => $user
         ]);
     }
+
+    /**
+     * Update authenticated user's profile (name, email, social links).
+     */
+    public function update(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'name' => 'nullable|string|max:255',
+            'email' => 'nullable|string|email|max:255|unique:users,email,' . $user->id,
+            'instagram_url' => 'nullable|url|max:1024',
+            'telegram_url' => 'nullable|url|max:1024',
+        ]);
+
+        if ($request->has('name')) {
+            $user->name = $request->input('name');
+        }
+
+        if ($request->has('email')) {
+            $user->email = $request->input('email');
+        }
+
+        if ($request->has('instagram_url')) {
+            $user->instagram_url = $request->input('instagram_url');
+        }
+
+        if ($request->has('telegram_url')) {
+            $user->telegram_url = $request->input('telegram_url');
+        }
+
+        $user->save();
+
+        return response()->json([
+            'message' => 'Profil muvaffaqiyatli yangilandi.',
+            'user' => $user,
+        ]);
+    }
 }
