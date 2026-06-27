@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Genre;
 use App\Models\Series;
 use App\Models\Chapter;
+use App\Models\Novel;
+use App\Models\NovelChapter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -15,26 +17,57 @@ class CatalogController extends Controller
      */
     public function series(Request $request)
     {
+        if ($request->has('type') && $request->type === 'novel') {
+            $query = Novel::with('genres');
+
+            if ($request->has('genre') && $request->genre) {
+                $query->whereHas('genres', function ($q) use ($request) {
+                    $q->where('slug', $request->genre);
+                });
+            }
+
+            if ($request->has('status') && $request->status) {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->has('search') && $request->search) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                      ->orWhere('alternative_titles', 'like', "%{$search}%");
+                });
+            }
+
+            $sort = $request->get('sort', 'popularity');
+            if ($sort === 'newest') {
+                $query->orderBy('created_at', 'desc');
+            } elseif ($sort === 'alphabetical') {
+                $query->orderBy('title', 'asc');
+            } else {
+                $query->orderBy('views_count', 'desc');
+            }
+
+            return response()->json($query->paginate(12));
+        }
+
         $query = Series::with('genres');
 
-        // Filter by Genre (slug)
         if ($request->has('genre') && $request->genre) {
             $query->whereHas('genres', function ($q) use ($request) {
                 $q->where('slug', $request->genre);
             });
         }
 
-        // Filter by Status
         if ($request->has('status') && $request->status) {
             $query->where('status', $request->status);
         }
 
-        // Filter by Type
         if ($request->has('type') && $request->type) {
             $query->where('type', $request->type);
+        } else {
+            $query->where('type', '!=', 'novel');
         }
 
-        // Search by Title or Alternative Titles
         if ($request->has('search') && $request->search) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -43,13 +76,12 @@ class CatalogController extends Controller
             });
         }
 
-        // Sorting
         $sort = $request->get('sort', 'popularity');
         if ($sort === 'newest') {
             $query->orderBy('created_at', 'desc');
         } elseif ($sort === 'alphabetical') {
             $query->orderBy('title', 'asc');
-        } else { // default 'popularity'
+        } else {
             $query->orderBy('views_count', 'desc');
         }
 
@@ -57,25 +89,40 @@ class CatalogController extends Controller
     }
 
     /**
-     * Get single series details.
+     * Get single series/novel details.
      */
     public function showSeries($slug)
     {
-        $series = Series::with(['genres', 'sponsors', 'translator'])->where('slug', $slug)->firstOrFail();
-        
-        // Increment view count
-        $series->increment('views_count');
+        $series = Series::with(['genres', 'sponsors', 'translator'])->where('slug', $slug)->first();
+        if ($series) {
+            $series->increment('views_count');
+            return response()->json($series);
+        }
 
-        return response()->json($series);
+        $novel = Novel::with(['genres', 'creator'])->where('slug', $slug)->firstOrFail();
+        $novel->increment('views_count');
+        
+        // Map creator to translator for frontend compatibility
+        $novelData = $novel->toArray();
+        $novelData['translator'] = $novel->creator;
+        $novelData['type'] = 'novel';
+        
+        return response()->json($novelData);
     }
 
     /**
-     * Get chapters of a series.
+     * Get chapters of a series/novel.
      */
     public function seriesChapters($slug)
     {
-        $series = Series::where('slug', $slug)->firstOrFail();
-        $chapters = $series->chapters()->orderBy('chapter_number', 'desc')->get();
+        $series = Series::where('slug', $slug)->first();
+        if ($series) {
+            $chapters = $series->chapters()->orderBy('chapter_number', 'desc')->get();
+            return response()->json($chapters);
+        }
+
+        $novel = Novel::where('slug', $slug)->firstOrFail();
+        $chapters = $novel->chapters()->orderBy('chapter_number', 'desc')->get();
 
         return response()->json($chapters);
     }
@@ -93,12 +140,19 @@ class CatalogController extends Controller
      */
     public function trending()
     {
-        $trending = Series::with('genres')
+        $trendingSeries = Series::with('genres')
             ->orderBy('views_count', 'desc')
             ->limit(6)
             ->get();
 
-        return response()->json($trending);
+        $trendingNovels = Novel::with('genres')
+            ->orderBy('views_count', 'desc')
+            ->limit(6)
+            ->get();
+
+        $combined = $trendingSeries->concat($trendingNovels)->sortByDesc('views_count')->take(10)->values();
+
+        return response()->json($combined);
     }
 
     /**
@@ -106,7 +160,6 @@ class CatalogController extends Controller
      */
     public function latestUpdates()
     {
-        // Load latest chapters with their series
         $chapters = Chapter::with('series')
             ->orderBy('published_at', 'desc')
             ->limit(10)
@@ -134,7 +187,6 @@ class CatalogController extends Controller
      */
     public function leaderboard()
     {
-        // 1. Top Daily Readers (unique chapter reads today by standard active users)
         $topReaders = DB::table('chapter_reads')
             ->join('users', 'chapter_reads.user_id', '=', 'users.id')
             ->select('users.id', 'users.name', 'users.avatar_url', DB::raw('COUNT(chapter_reads.id) as chapters_count'))
@@ -154,7 +206,6 @@ class CatalogController extends Controller
                 ];
             });
 
-        // 2. Top Diamond Buyers (total diamonds purchased by standard active users)
         $topBuyers = DB::table('diamond_transactions')
             ->join('users', 'diamond_transactions.user_id', '=', 'users.id')
             ->select('users.id', 'users.name', 'users.avatar_url', DB::raw('SUM(diamond_transactions.amount) as total_diamonds'))
@@ -191,7 +242,6 @@ class CatalogController extends Controller
             ->limit(5)
             ->get();
 
-        // Fallback to trending if no series is marked as is_slider
         if ($sliderSeries->isEmpty()) {
             $sliderSeries = Series::with('genres')
                 ->orderBy('views_count', 'desc')

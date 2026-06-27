@@ -13,7 +13,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'avatar', 'avatar_url', 'diamond_balance', 'role', 'is_banned', 'referred_by', 'instagram_url', 'telegram_url'])]
+#[Fillable(['name', 'email', 'password', 'avatar', 'avatar_url', 'diamond_balance', 'role', 'is_banned', 'referred_by', 'instagram_url', 'telegram_url', 'novel_creator_expires_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -72,6 +72,21 @@ class User extends Authenticatable
         return $this->hasMany(CartItem::class);
     }
 
+    public function novelPurchases(): HasMany
+    {
+        return $this->hasMany(NovelPurchase::class);
+    }
+
+    public function creatorApplications(): HasMany
+    {
+        return $this->hasMany(NovelCreatorApplication::class);
+    }
+
+    public function paymentMethods(): HasMany
+    {
+        return $this->hasMany(PaymentMethod::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -84,6 +99,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_banned' => 'boolean',
             'diamond_balance' => 'integer',
+            'novel_creator_expires_at' => 'datetime',
         ];
     }
 
@@ -141,7 +157,11 @@ class User extends Authenticatable
     public function getPermissionsAttribute(): array
     {
         if ($this->role === 'admin') {
-            return ['dashboard', 'topup_requests', 'series', 'packages', 'users', 'coupons', 'sponsors', 'books', 'orders', 'permissions'];
+            return ['dashboard', 'topup_requests', 'series', 'packages', 'users', 'coupons', 'sponsors', 'books', 'orders', 'permissions', 'creator_dashboard', 'novels_management', 'creator_topups', 'creator_payment_methods'];
+        }
+
+        if ($this->role === 'novel_creator') {
+            return ['creator_dashboard', 'novels_management', 'creator_topups', 'creator_payment_methods'];
         }
 
         try {

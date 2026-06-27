@@ -2,15 +2,21 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'chapter_id', 'content', 'image_path'])]
 class ChapterComment extends Model
 {
     use HasFactory;
+
+    protected $fillable = [
+        'user_id',
+        'chapter_id',
+        'novel_chapter_id',
+        'content',
+        'image_path'
+    ];
 
     /**
      * The user who posted this comment.
@@ -21,10 +27,18 @@ class ChapterComment extends Model
     }
 
     /**
-     * The chapter this comment belongs to.
+     * The Manhwa chapter this comment belongs to.
      */
     public function chapter(): BelongsTo
     {
         return $this->belongsTo(Chapter::class);
+    }
+
+    /**
+     * The Novel chapter this comment belongs to.
+     */
+    public function novelChapter(): BelongsTo
+    {
+        return $this->belongsTo(NovelChapter::class, 'novel_chapter_id');
     }
 }

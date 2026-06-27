@@ -20,12 +20,9 @@ class TopupController extends Controller
         return response()->json($packages);
     }
 
-    /**
-     * Get active payment methods (bank cards).
-     */
     public function paymentMethods()
     {
-        $cards = PaymentMethod::where('is_active', true)->get();
+        $cards = PaymentMethod::where('is_active', true)->whereNull('user_id')->get();
         return response()->json($cards);
     }
 
@@ -36,7 +33,7 @@ class TopupController extends Controller
     {
         $user = $request->user();
         $packages = DiamondPackage::where('is_active', true)->orderBy('sort_order', 'asc')->get();
-        $cards = PaymentMethod::where('is_active', true)->get();
+        $cards = PaymentMethod::where('is_active', true)->whereNull('user_id')->get();
 
         return response()->json([
             'diamond_balance' => $user->diamond_balance,

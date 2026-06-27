@@ -10,6 +10,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CouponController;
 use App\Http\Controllers\SponsorController;
 use App\Http\Controllers\RatingLikeController;
+use App\Http\Controllers\NovelController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -50,8 +51,11 @@ Route::get('/latest-updates', [CatalogController::class, 'latestUpdates']);
 Route::get('/completed', [CatalogController::class, 'completed']);
 Route::get('/sponsors', [SponsorController::class, 'publicIndex']);
 Route::get('/chapters/{chapterId}/comments', [\App\Http\Controllers\ChapterCommentController::class, 'index']);
+Route::get('/novel-chapters/{id}', [ChapterController::class, 'showNovelChapter']);
+Route::get('/novel-chapters/{chapterId}/comments', [\App\Http\Controllers\ChapterCommentController::class, 'novelComments']);
 Route::get('/leaderboard', [CatalogController::class, 'leaderboard']);
 Route::get('/books', [\App\Http\Controllers\BookController::class, 'index']);
+Route::get('/topup/payment-methods', [TopupController::class, 'paymentMethods']);
 
 // News & Translators (Public)
 Route::get('/news', [\App\Http\Controllers\NewsController::class, 'index']);
@@ -84,7 +88,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/series/{id}/rate', [RatingLikeController::class, 'rate']);
     Route::post('/series/{id}/like', [RatingLikeController::class, 'toggleLike']);
     Route::get('/series/{id}/rating-like-status', [RatingLikeController::class, 'checkStatus']);
+    Route::post('/novels/{id}/rate', [RatingLikeController::class, 'rateNovel']);
+    Route::post('/novels/{id}/like', [RatingLikeController::class, 'toggleLikeNovel']);
+    Route::get('/novels/{id}/rating-like-status', [RatingLikeController::class, 'checkNovelStatus']);
     Route::post('/chapters/{chapterId}/comments', [\App\Http\Controllers\ChapterCommentController::class, 'store']);
+    Route::post('/novel-chapters/{chapterId}/comments', [\App\Http\Controllers\ChapterCommentController::class, 'storeNovelComment']);
     Route::delete('/comments/{id}', [\App\Http\Controllers\ChapterCommentController::class, 'destroy']);
 
     // Book orders
@@ -94,6 +102,15 @@ Route::middleware('auth:sanctum')->group(function () {
     // Translators Auth Actions
     Route::post('/translators/{id}/follow', [\App\Http\Controllers\TranslatorController::class, 'toggleFollow']);
     Route::post('/translators/apply', [\App\Http\Controllers\TranslatorController::class, 'apply']);
+
+    // Novel Creator Applications
+    Route::post('/novel-creators/apply', [NovelController::class, 'apply']);
+    Route::get('/novel-creators/application-status', [NovelController::class, 'applicationStatus']);
+
+    // Novel Purchases & Subscriptions
+    Route::post('/novels/{id}/purchase', [NovelController::class, 'purchaseNovelOrChapter']);
+    Route::get('/novels/{id}/purchase-status', [NovelController::class, 'getPurchaseStatus']);
+    Route::get('/novels/{id}/payment-methods', [NovelController::class, 'getNovelPaymentMethods']);
 });
 
 // 4. Reports (Guest or Auth)
@@ -102,6 +119,8 @@ Route::post('/reports', [ReportController::class, 'store']);
 // 5. Admin Panel routes (Auth + Admin check in Controller)
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('/stats', [AdminController::class, 'stats']);
+    Route::get('/settings', [NovelController::class, 'getSettings']);
+    Route::post('/settings', [NovelController::class, 'updateSettings']);
 
     // Role Permissions Management (admin only)
     Route::get('/permissions', [AdminController::class, 'getPermissions']);
@@ -172,4 +191,36 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     // Translator Applications admin CRUD
     Route::get('/translator-applications', [AdminController::class, 'getTranslatorApplications']);
     Route::post('/translator-applications/{id}/status', [AdminController::class, 'updateTranslatorApplication']);
+
+    // Novel Creator Applications admin CRUD (Superadmin)
+    Route::get('/novel-creator-applications', [NovelController::class, 'listApplications']);
+    Route::post('/novel-creator-applications/{id}/approve', [NovelController::class, 'approveApplication']);
+    Route::post('/novel-creator-applications/{id}/reject', [NovelController::class, 'rejectApplication']);
+});
+
+// 6. Novel Creator Dashboard routes (Auth required + creator check)
+Route::middleware(['auth:sanctum'])->prefix('creator')->group(function () {
+    Route::get('/stats', [NovelController::class, 'creatorStats']);
+    
+    // Creator Novels CRUD
+    Route::get('/novels', [NovelController::class, 'listCreatorNovels']);
+    Route::post('/novels', [NovelController::class, 'storeCreatorNovel']);
+    Route::post('/novels/{id}', [NovelController::class, 'updateCreatorNovel']);
+    Route::delete('/novels/{id}', [NovelController::class, 'deleteCreatorNovel']);
+    
+    // Creator Chapters CRUD
+    Route::post('/novels/{novelId}/chapters', [NovelController::class, 'storeCreatorChapter']);
+    Route::put('/chapters/{id}', [NovelController::class, 'updateCreatorChapter']);
+    Route::delete('/chapters/{id}', [NovelController::class, 'deleteCreatorChapter']);
+    
+    // Creator Purchases verification
+    Route::get('/purchases', [NovelController::class, 'listCreatorPurchases']);
+    Route::post('/purchases/{id}/approve', [NovelController::class, 'approvePurchase']);
+    Route::post('/purchases/{id}/reject', [NovelController::class, 'rejectPurchase']);
+    
+    // Creator Card Management
+    Route::get('/payment-methods', [NovelController::class, 'listCreatorPaymentMethods']);
+    Route::post('/payment-methods', [NovelController::class, 'storeCreatorPaymentMethod']);
+    Route::put('/payment-methods/{id}', [NovelController::class, 'updateCreatorPaymentMethod']);
+    Route::delete('/payment-methods/{id}', [NovelController::class, 'deleteCreatorPaymentMethod']);
 });

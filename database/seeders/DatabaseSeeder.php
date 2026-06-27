@@ -58,7 +58,6 @@ class DatabaseSeeder extends Seeder
             'name' => '100 Olmos',
             'diamond_amount' => 100,
             'price' => 15000,
-            'badge_text' => null,
             'is_active' => true,
             'sort_order' => 1,
         ]);
@@ -67,7 +66,6 @@ class DatabaseSeeder extends Seeder
             'name' => '300 Olmos',
             'diamond_amount' => 300,
             'price' => 40000,
-            'badge_text' => 'Eng Ommabop',
             'is_active' => true,
             'sort_order' => 2,
         ]);
@@ -76,7 +74,6 @@ class DatabaseSeeder extends Seeder
             'name' => '1000 Olmos',
             'diamond_amount' => 1000,
             'price' => 120000,
-            'badge_text' => 'Foydali',
             'is_active' => true,
             'sort_order' => 3,
         ]);

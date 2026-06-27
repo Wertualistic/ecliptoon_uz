@@ -6,30 +6,23 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class SeriesLike extends Model
+class NovelCreatorApplication extends Model
 {
     use HasFactory;
 
-    protected $table = 'series_likes';
-
     protected $fillable = [
         'user_id',
-        'series_id',
-        'novel_id'
+        'receipt_image_path',
+        'user_note',
+        'status',
+        'admin_note'
     ];
 
+    /**
+     * User who applied.
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function series(): BelongsTo
-    {
-        return $this->belongsTo(Series::class);
-    }
-
-    public function novel(): BelongsTo
-    {
-        return $this->belongsTo(Novel::class);
     }
 }

@@ -15,61 +15,70 @@ class DashboardController extends Controller
     public function bookmarks(Request $request)
     {
         $user = $request->user();
-        $bookmarks = Bookmark::with(['series.genres'])
+        $bookmarks = Bookmark::with(['series.genres', 'novel.genres'])
             ->where('user_id', $user->id)
             ->get()
             ->map(function ($b) {
-                return $b->series;
-            });
+                return $b->series ?: $b->novel;
+            })
+            ->filter();
 
-        return response()->json($bookmarks);
+        return response()->json($bookmarks->values());
     }
 
     /**
-     * Add series to bookmarks.
+     * Add series or novel to bookmarks.
      */
     public function addBookmark(Request $request)
     {
         $request->validate([
-            'series_id' => 'required|exists:series,id',
+            'series_id' => 'nullable|exists:series,id',
+            'novel_id' => 'nullable|exists:novels,id',
         ]);
 
         $user = $request->user();
 
-        $bookmark = Bookmark::firstOrCreate([
-            'user_id' => $user->id,
-            'series_id' => $request->series_id,
-        ]);
+        if ($request->novel_id) {
+            $bookmark = Bookmark::firstOrCreate([
+                'user_id' => $user->id,
+                'novel_id' => $request->novel_id,
+            ]);
+        } else {
+            $bookmark = Bookmark::firstOrCreate([
+                'user_id' => $user->id,
+                'series_id' => $request->series_id,
+            ]);
+        }
 
         return response()->json([
-            'message' => 'Kutubxonaga muvaffaqiyatli qo\'shildi.', // "Successfully added to library."
+            'message' => 'Kutubxonaga muvaffaqiyatli qo\'shildi.',
             'bookmark' => $bookmark
         ]);
     }
 
     /**
-     * Remove series from bookmarks.
+     * Remove series or novel from bookmarks.
      */
-    public function removeBookmark($seriesId, Request $request)
+    public function removeBookmark($id, Request $request)
     {
         $user = $request->user();
 
-        // Check if user passed the bookmark ID or series ID. We will search by both to be safe.
         $deleted = Bookmark::where('user_id', $user->id)
-            ->where(function($q) use ($seriesId) {
-                $q->where('series_id', $seriesId)
-                  ->orWhere('id', $seriesId);
+            ->where(function($q) use ($id) {
+                $q->where('series_id', $id)
+                  ->orWhere('novel_id', $id)
+                  ->orWhere('id', $id);
             })
             ->delete();
 
         if ($deleted) {
             return response()->json([
-                'message' => 'Kutubxonadan o\'chirildi.' // "Removed from library."
+                'message' => 'Kutubxonadan o\'chirildi.'
             ]);
         }
 
         return response()->json([
-            'message' => 'Bookmark topilmadi.' // "Bookmark not found."
+            'message' => 'Bookmark topilmadi.'
         ], 404);
     }
 

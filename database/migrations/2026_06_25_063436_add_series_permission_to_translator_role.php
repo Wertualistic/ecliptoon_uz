@@ -12,14 +12,16 @@ return new class extends Migration
     public function up(): void
     {
         // Add series permission for translators
-        \Illuminate\Support\Facades\DB::table('role_permissions')->insert([
+        \Illuminate\Support\Facades\DB::table('role_permissions')->updateOrInsert(
             [
                 'role' => 'translator',
                 'permission' => 'series',
+            ],
+            [
                 'created_at' => now(),
                 'updated_at' => now()
-            ],
-        ]);
+            ]
+        );
     }
 
     /**
