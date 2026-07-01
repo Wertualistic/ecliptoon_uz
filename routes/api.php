@@ -116,6 +116,9 @@ Route::middleware('auth:sanctum')->group(function () {
 // 4. Reports (Guest or Auth)
 Route::post('/reports', [ReportController::class, 'store']);
 
+// Telegram Bot Webhook
+Route::post('/telegram/webhook', [\App\Http\Controllers\TelegramBotController::class, 'webhook']);
+
 // 5. Admin Panel routes (Auth + Admin check in Controller)
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
     Route::get('/stats', [AdminController::class, 'stats']);
