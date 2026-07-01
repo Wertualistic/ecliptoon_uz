@@ -77,9 +77,16 @@ class TelegramBotController extends Controller
                 }
             }
 
+            $botUsername = env('TELEGRAM_BOT_USERNAME', 'ecliptoon_bot');
+            $appShortName = env('TELEGRAM_APP_SHORT_NAME', 'read');
+
+            $targetUrl = ($botUsername && $appShortName)
+                ? "https://t.me/{$botUsername}/{$appShortName}?startapp=series_{$series->slug}"
+                : "{$frontendUrl}/series/{$series->slug}";
+
             $messageText = "📚 *{$series->title}*{$alternativeText}\n\n" 
                 . ($series->description ? strip_tags($series->description) . "\n\n" : "") 
-                . "👉 [Manhvani o'qish]({$frontendUrl}/series/{$series->slug})";
+                . "👉 [Manhvani o'qish]({$targetUrl})";
 
             $results[] = [
                 'type' => 'article',
@@ -95,7 +102,7 @@ class TelegramBotController extends Controller
                         [
                             [
                                 'text' => "📖 O'qish",
-                                'url' => "{$frontendUrl}/series/{$series->slug}"
+                                'url' => $targetUrl
                             ]
                         ]
                     ]
@@ -177,12 +184,19 @@ class TelegramBotController extends Controller
                 $responseMessage = "Quyidagi manhwalarni topdim: 🔍\n\n";
                 $inlineKeyboard = [];
                 
+                $botUsername = env('TELEGRAM_BOT_USERNAME', 'ecliptoon_bot');
+                $appShortName = env('TELEGRAM_APP_SHORT_NAME', 'read');
+
                 foreach ($seriesList as $series) {
+                    $targetUrl = ($botUsername && $appShortName)
+                        ? "https://t.me/{$botUsername}/{$appShortName}?startapp=series_{$series->slug}"
+                        : "{$frontendUrl}/series/{$series->slug}";
+
                     $responseMessage .= "📚 *{$series->title}*\n";
                     $inlineKeyboard[] = [
                         [
                             'text' => "📖 {$series->title}",
-                            'url' => "{$frontendUrl}/series/{$series->slug}"
+                            'url' => $targetUrl
                         ]
                     ];
                 }
