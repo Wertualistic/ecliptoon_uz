@@ -14,7 +14,7 @@ class TelegramBotController extends Controller
     public function webhook(Request $request)
     {
         $update = $request->all();
-        
+
         Log::info('Telegram Webhook Update received:', $update);
 
         $botToken = env('TELEGRAM_BOT_TOKEN');
@@ -60,8 +60,8 @@ class TelegramBotController extends Controller
 
         $results = [];
         foreach ($seriesList as $series) {
-            $coverUrl = filter_var($series->cover_image, FILTER_VALIDATE_URL) 
-                ? $series->cover_image 
+            $coverUrl = filter_var($series->cover_image, FILTER_VALIDATE_URL)
+                ? $series->cover_image
                 : asset('storage/' . $series->cover_image);
 
             $desc = strip_tags($series->description ?? '');
@@ -69,23 +69,18 @@ class TelegramBotController extends Controller
 
             $alternativeText = "";
             if (!empty($series->alternative_titles)) {
-                $altTitles = is_string($series->alternative_titles) 
-                    ? json_decode($series->alternative_titles, true) 
+                $altTitles = is_string($series->alternative_titles)
+                    ? json_decode($series->alternative_titles, true)
                     : $series->alternative_titles;
                 if (is_array($altTitles) && !empty($altTitles)) {
                     $alternativeText = "\nMuqobil: _" . implode(', ', $altTitles) . "_";
                 }
             }
 
-            $botUsername = env('TELEGRAM_BOT_USERNAME', 'ecliptoon_bot');
-            $appShortName = env('TELEGRAM_APP_SHORT_NAME');
+            $targetUrl = "{$frontendUrl}/series/{$series->slug}";
 
-            $targetUrl = !empty($appShortName)
-                ? "https://t.me/{$botUsername}/{$appShortName}?startapp=series_{$series->slug}"
-                : "https://t.me/{$botUsername}?startapp=series_{$series->slug}";
-
-            $messageText = "📚 *{$series->title}*{$alternativeText}\n\n" 
-                . ($series->description ? strip_tags($series->description) . "\n\n" : "") 
+            $messageText = "📚 *{$series->title}*{$alternativeText}\n\n"
+                . ($series->description ? strip_tags($series->description) . "\n\n" : "")
                 . "👉 [Manhvani o'qish]({$targetUrl})";
 
             $results[] = [
@@ -183,14 +178,9 @@ class TelegramBotController extends Controller
             } else {
                 $responseMessage = "Quyidagi manhwalarni topdim: 🔍\n\n";
                 $inlineKeyboard = [];
-                
-                $botUsername = env('TELEGRAM_BOT_USERNAME', 'ecliptoon_bot');
-                $appShortName = env('TELEGRAM_APP_SHORT_NAME');
 
                 foreach ($seriesList as $series) {
-                    $targetUrl = !empty($appShortName)
-                        ? "https://t.me/{$botUsername}/{$appShortName}?startapp=series_{$series->slug}"
-                        : "https://t.me/{$botUsername}?startapp=series_{$series->slug}";
+                    $targetUrl = "{$frontendUrl}/series/{$series->slug}";
 
                     $responseMessage .= "📚 *{$series->title}*\n";
                     $inlineKeyboard[] = [
@@ -200,7 +190,7 @@ class TelegramBotController extends Controller
                         ]
                     ];
                 }
-                
+
                 // Add mini app button at the end
                 $inlineKeyboard[] = [
                     [
