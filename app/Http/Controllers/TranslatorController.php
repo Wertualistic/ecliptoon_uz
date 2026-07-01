@@ -4,16 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-
 use App\Models\TranslatorApplication;
 
 class TranslatorController extends Controller
 {
     public function index()
     {
-        $translators = User::where('role', 'translator')
-            ->withCount('translatedSeries')
-            ->withCount('followers')
+        $translators = User::whereIn('role', ['translator', 'novel_creator', 'admin'])
+            ->withCount(['translatedSeries', 'createdNovels', 'followers'])
             ->orderBy('followers_count', 'desc')
             ->get();
 
@@ -23,11 +21,16 @@ class TranslatorController extends Controller
     public function show($id, Request $request)
     {
         $translator = User::where('id', $id)
-            ->where('role', 'translator')
+            ->whereIn('role', ['translator', 'novel_creator', 'admin'])
             ->withCount('followers')
-            ->with(['translatedSeries' => function($query) {
-                $query->orderBy('created_at', 'desc');
-            }])
+            ->with([
+                'translatedSeries' => function($query) {
+                    $query->with('genres')->orderBy('created_at', 'desc');
+                },
+                'createdNovels' => function($query) {
+                    $query->with('genres')->orderBy('created_at', 'desc');
+                }
+            ])
             ->firstOrFail();
 
         $isFollowing = false;
@@ -35,8 +38,22 @@ class TranslatorController extends Controller
             $isFollowing = $translator->followers()->where('user_id', $user->id)->exists();
         }
 
+        $translatorArr = $translator->toArray();
+        // Merge series and novels into projects for frontend rendering
+        $seriesProjects = collect($translatorArr['translated_series'] ?? [])->map(function($item) {
+            $item['type'] = $item['type'] ?? 'manhwa';
+            return $item;
+        });
+        $novelProjects = collect($translatorArr['created_novels'] ?? [])->map(function($item) {
+            $item['type'] = 'novel';
+            return $item;
+        });
+
+        $translatorArr['projects'] = $seriesProjects->concat($novelProjects)->sortByDesc('created_at')->values()->all();
+        $translatorArr['projects_count'] = count($translatorArr['projects']);
+
         return response()->json([
-            'translator' => $translator,
+            'translator' => $translatorArr,
             'is_following' => $isFollowing
         ]);
     }
@@ -44,7 +61,7 @@ class TranslatorController extends Controller
     public function toggleFollow($id, Request $request)
     {
         $user = $request->user();
-        $translator = User::where('id', $id)->where('role', 'translator')->firstOrFail();
+        $translator = User::where('id', $id)->whereIn('role', ['translator', 'novel_creator', 'admin'])->firstOrFail();
 
         if ($translator->id === $user->id) {
             return response()->json(['message' => 'O\'zingizga obuna bo\'lolmaysiz.'], 400);

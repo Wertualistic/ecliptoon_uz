@@ -49,6 +49,12 @@ class User extends Authenticatable
         return $this->hasMany(Series::class, 'translator_id');
     }
 
+    // A creator can have many created novels
+    public function createdNovels(): HasMany
+    {
+        return $this->hasMany(Novel::class, 'creator_id');
+    }
+
     // A translator has many followers
     public function followers()
     {
