@@ -78,11 +78,11 @@ class TelegramBotController extends Controller
             }
 
             $botUsername = env('TELEGRAM_BOT_USERNAME', 'ecliptoon_bot');
-            $appShortName = env('TELEGRAM_APP_SHORT_NAME', 'read');
+            $appShortName = env('TELEGRAM_APP_SHORT_NAME');
 
-            $targetUrl = ($botUsername && $appShortName)
+            $targetUrl = !empty($appShortName)
                 ? "https://t.me/{$botUsername}/{$appShortName}?startapp=series_{$series->slug}"
-                : "{$frontendUrl}/series/{$series->slug}";
+                : "https://t.me/{$botUsername}?startapp=series_{$series->slug}";
 
             $messageText = "📚 *{$series->title}*{$alternativeText}\n\n" 
                 . ($series->description ? strip_tags($series->description) . "\n\n" : "") 
@@ -185,12 +185,12 @@ class TelegramBotController extends Controller
                 $inlineKeyboard = [];
                 
                 $botUsername = env('TELEGRAM_BOT_USERNAME', 'ecliptoon_bot');
-                $appShortName = env('TELEGRAM_APP_SHORT_NAME', 'read');
+                $appShortName = env('TELEGRAM_APP_SHORT_NAME');
 
                 foreach ($seriesList as $series) {
-                    $targetUrl = ($botUsername && $appShortName)
+                    $targetUrl = !empty($appShortName)
                         ? "https://t.me/{$botUsername}/{$appShortName}?startapp=series_{$series->slug}"
-                        : "{$frontendUrl}/series/{$series->slug}";
+                        : "https://t.me/{$botUsername}?startapp=series_{$series->slug}";
 
                     $responseMessage .= "📚 *{$series->title}*\n";
                     $inlineKeyboard[] = [
